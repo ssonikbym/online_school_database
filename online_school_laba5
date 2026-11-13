@@ -1,0 +1,346 @@
+-- 1. СОЗДАНИЕ БАЗЫ ДАННЫХ ------------------------------------------------
+DROP DATABASE IF EXISTS online_school;
+CREATE DATABASE online_school
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+ 
+USE online_school;
+ 
+-- 2. СОЗДАНИЕ ТАБЛИЦ И СВЯЗЕЙ --------------------------------------------
+-- Сначала родительские таблицы, затем дочерние
+ 
+CREATE TABLE subjects (
+subject_code CHAR(2) NOT NULL,
+subject_name VARCHAR(50) NOT NULL,
+PRIMARY KEY (subject_code),
+UNIQUE (subject_name)
+) ENGINE = InnoDB;
+ 
+CREATE TABLE courses (
+course_id INT NOT NULL AUTO_INCREMENT,
+course_name VARCHAR(100) NOT NULL,
+subject_code CHAR(2) NOT NULL,
+price DECIMAL(8,2) NOT NULL,
+PRIMARY KEY (course_id),
+CONSTRAINT fk_courses_subjects FOREIGN KEY (subject_code)
+REFERENCES subjects (subject_code)
+ON UPDATE CASCADE ON DELETE RESTRICT,
+CONSTRAINT chk_courses_price CHECK (price > 0)
+) ENGINE = InnoDB;
+ 
+CREATE TABLE students (
+student_id INT NOT NULL AUTO_INCREMENT,
+student_name VARCHAR(100) NOT NULL,
+grade TINYINT NOT NULL,
+parent_phone CHAR(18) NOT NULL,
+PRIMARY KEY (student_id),
+CONSTRAINT chk_students_grade CHECK (grade BETWEEN 1 AND 11)
+) ENGINE = InnoDB;
+ 
+CREATE TABLE teachers (
+teacher_id INT NOT NULL AUTO_INCREMENT,
+teacher_name VARCHAR(100) NOT NULL,
+rate DECIMAL(8,2) NOT NULL,
+PRIMARY KEY (teacher_id),
+CONSTRAINT chk_teachers_rate CHECK (rate > 0)
+) ENGINE = InnoDB;
+ 
+CREATE TABLE enrollments (
+student_id INT NOT NULL,
+course_id INT NOT NULL,
+teacher_id INT NOT NULL,
+discount TINYINT NOT NULL DEFAULT 0,
+PRIMARY KEY (student_id, course_id),
+CONSTRAINT fk_enr_students FOREIGN KEY (student_id)
+REFERENCES students (student_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+CONSTRAINT fk_enr_courses FOREIGN KEY (course_id)
+REFERENCES courses (course_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+CONSTRAINT fk_enr_teachers FOREIGN KEY (teacher_id)
+REFERENCES teachers (teacher_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+CONSTRAINT chk_enr_discount CHECK (discount BETWEEN 0 AND 50)
+) ENGINE = InnoDB;
+ 
+CREATE TABLE lessons (
+student_id INT NOT NULL,
+course_id INT NOT NULL,
+lesson_date DATE NOT NULL,
+topic VARCHAR(150) NOT NULL,
+attended BOOLEAN NOT NULL DEFAULT 1,
+hw_score TINYINT NULL,
+paid BOOLEAN NOT NULL DEFAULT 0,
+PRIMARY KEY (student_id, course_id, lesson_date),
+CONSTRAINT fk_lessons_enrollments FOREIGN KEY (student_id, course_id)
+REFERENCES enrollments (student_id, course_id)
+ON UPDATE CASCADE ON DELETE CASCADE,
+CONSTRAINT chk_lessons_score CHECK (hw_score BETWEEN 0 AND 100)
+) ENGINE = InnoDB;
+ 
+-- 3. ИЗМЕНЕНИЕ СТРУКТУРЫ ТАБЛИЦ (ALTER TABLE) -----------------------------
+-- 3.1 Добавляем поле e-mail родителя (необязательное)
+ALTER TABLE students ADD COLUMN parent_email VARCHAR(100) NULL AFTER parent_phone;
+ 
+-- 3.2 Увеличиваем длину названия курса
+ALTER TABLE courses MODIFY COLUMN course_name VARCHAR(120) NOT NULL;
+ 
+-- 3.3 Добавляем ограничение уникальности названия курса
+ALTER TABLE courses ADD CONSTRAINT uq_courses_name UNIQUE (course_name);
+ 
+-- 3.4 Добавляем индекс для быстрого поиска занятий по дате
+ALTER TABLE lessons ADD INDEX idx_lessons_date (lesson_date);
+ 
+-- 4. ВСТАВКА ЗАПИСЕЙ (INSERT INTO) ----------------------------------------
+INSERT INTO subjects (subject_code, subject_name) VALUES
+('01', 'Математика'),
+('02', 'Русский язык'),
+('03', 'Английский язык'),
+('04', 'Химия');
+ 
+INSERT INTO courses (course_id, course_name, subject_code, price) VALUES
+(1, 'ЕГЭ. Профильная математика', '01', 1200.00),
+(2, 'ОГЭ. Математика', '01', 1000.00),
+(3, 'ЕГЭ. Русский язык', '02', 1900.00),
+(4, 'ОГЭ. Английский язык', '03', 1700.00);
+ 
+INSERT INTO students (student_id, student_name, grade, parent_phone, parent_email) VALUES
+(1, 'Иванова Анна', 9, '+7 (912) 345-67-01', 'ivanova@example.ru'),
+(2, 'Смирнов Кирилл', 9, '+7 (922) 118-40-52', NULL),
+(3, 'Кузнецова Мария', 11, '+7 (903) 771-25-63', 'kuznetsov@example.ru'),
+(4, 'Попов Артём', 9, '+7 (950) 204-18-34', NULL),
+(5, 'Лебедев Тимур', 8, '+7 (987) 300-14-49', NULL);
+ 
+INSERT INTO teachers (teacher_id, teacher_name, rate) VALUES
+(1, 'Петрова Анна Сергеевна', 900.00),
+(2, 'Смирнова Ольга Викторовна', 1100.00),
+(3, 'Орлова Екатерина Павловна', 1000.00);
+ 
+INSERT INTO enrollments (student_id, course_id, teacher_id, discount) VALUES
+(1, 2, 1, 0),
+(2, 2, 1, 10),
+(3, 1, 1, 0),
+(3, 3, 2, 10),
+(4, 2, 1, 0);
+ 
+INSERT INTO lessons (student_id, course_id, lesson_date, topic, attended, hw_score, paid) VALUES
+(1, 2, '2026-10-06', 'Задания 1–5: практические задачи', 1, 85, 1),
+(2, 2, '2026-10-06', 'Задания 1–5: практические задачи', 1, 70, 1),
+(4, 2, '2026-10-06', 'Задания 1–5: практические задачи', 0, NULL, 0),
+(3, 1, '2026-10-07', 'Задание 13: тригонометрические уравнения', 1, 80, 1),
+(1, 2, '2026-10-08', 'Квадратные уравнения', 1, 90, 1),
+(2, 2, '2026-10-08', 'Квадратные уравнения', 1, 75, 0),
+(4, 2, '2026-10-08', 'Квадратные уравнения', 1, 60, 0),
+(3, 3, '2026-10-05', 'Задание 27: сочинение', 1, 70, 0);
+ 
+-- 5. ОБНОВЛЕНИЕ ЗАПИСЕЙ (UPDATE) ------------------------------------------
+-- 5.1 Поступила оплата от Смирнова Кирилла за занятие 08.10.2026
+UPDATE lessons
+SET paid = 1
+WHERE student_id = 2 AND course_id = 2 AND lesson_date = '2026-10-08';
+ 
+-- 5.2 Повышение ставки преподавателя Петровой А. С. на 10 %
+UPDATE teachers
+SET rate = rate * 1.10
+WHERE teacher_id = 1;
+ 
+-- 5.3 Изменение стоимости занятия по курсу «ОГЭ. Английский язык»
+UPDATE courses
+SET price = 1800.00
+WHERE course_name = 'ОГЭ. Английский язык';
+ 
+-- 6. УДАЛЕНИЕ ЗАПИСЕЙ (DELETE FROM) ---------------------------------------
+-- 6.1 Добавляем тестового ученика и удаляем его (заявка отменена)
+INSERT INTO students (student_id, student_name, grade, parent_phone)
+VALUES (6, 'Тестовый Ученик', 5, '+7 (900) 000-00-00');
+ 
+DELETE FROM students
+WHERE student_id = 6;
+ 
+-- 6.2 Удаляем ошибочно внесённую запись журнала
+INSERT INTO lessons (student_id, course_id, lesson_date, topic, attended, hw_score, paid)
+VALUES (1, 2, '2026-10-10', 'Ошибочная запись', 1, NULL, 0);
+ 
+DELETE FROM lessons
+WHERE student_id = 1 AND course_id = 2 AND lesson_date = '2026-10-10';
+ 
+-- 7. СОЗДАНИЕ ПОЛЬЗОВАТЕЛЕЙ И НАДЕЛЕНИЕ ПРАВАМИ ----------------------------
+-- Роли согласно анализу требований (лабораторная работа № 1)
+DROP USER IF EXISTS 'school_manager'@'localhost';
+DROP USER IF EXISTS 'school_teacher'@'localhost';
+DROP USER IF EXISTS 'school_director'@'localhost';
+DROP USER IF EXISTS 'school_admin'@'localhost';
+ 
+CREATE USER 'school_manager'@'localhost' IDENTIFIED BY 'Manager_2026';
+CREATE USER 'school_teacher'@'localhost' IDENTIFIED BY 'Teacher_2026';
+CREATE USER 'school_director'@'localhost' IDENTIFIED BY 'Director_2026';
+CREATE USER 'school_admin'@'localhost' IDENTIFIED BY 'Admin_2026';
+ 
+-- Менеджер: регистрирует учеников, зачисляет на курсы, отмечает оплату
+GRANT SELECT, INSERT, UPDATE ON online_school.students TO 'school_manager'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON online_school.enrollments TO 'school_manager'@'localhost';
+GRANT SELECT, UPDATE (paid) ON online_school.lessons TO 'school_manager'@'localhost';
+GRANT SELECT ON online_school.courses TO 'school_manager'@'localhost';
+GRANT SELECT ON online_school.teachers TO 'school_manager'@'localhost';
+GRANT SELECT ON online_school.subjects TO 'school_manager'@'localhost';
+ 
+-- Преподаватель: видит своих учеников, ведёт журнал (без отметки об оплате)
+GRANT SELECT ON online_school.students TO 'school_teacher'@'localhost';
+GRANT SELECT ON online_school.courses TO 'school_teacher'@'localhost';
+GRANT SELECT ON online_school.enrollments TO 'school_teacher'@'localhost';
+GRANT SELECT, INSERT ON online_school.lessons TO 'school_teacher'@'localhost';
+GRANT UPDATE (topic, attended, hw_score) ON online_school.lessons TO 'school_teacher'@'localhost';
+ 
+-- Руководитель: ведёт курсы, предметы, преподавателей; просматривает всё
+GRANT SELECT ON online_school.* TO 'school_director'@'localhost';
+GRANT INSERT, UPDATE ON online_school.courses TO 'school_director'@'localhost';
+GRANT INSERT, UPDATE ON online_school.subjects TO 'school_director'@'localhost';
+GRANT INSERT, UPDATE ON online_school.teachers TO 'school_director'@'localhost';
+ 
+-- Администратор БД: полный доступ к базе
+GRANT ALL PRIVILEGES ON online_school.* TO 'school_admin'@'localhost' WITH GRANT OPTION;
+ 
+FLUSH PRIVILEGES;
+ 
+-- Проверка выданных прав
+SHOW GRANTS FOR 'school_manager'@'localhost';
+SHOW GRANTS FOR 'school_teacher'@'localhost';
+SHOW GRANTS FOR 'school_director'@'localhost';
+SHOW GRANTS FOR 'school_admin'@'localhost';
+ 
+-- 8. ВЫГРУЗКА МЕТАДАННЫХ ТАБЛИЦ (DESCRIBE) --------------------------------
+DESCRIBE subjects;
+DESCRIBE courses;
+DESCRIBE students;
+DESCRIBE teachers;
+DESCRIBE enrollments;
+DESCRIBE lessons;
+
+-- 1. НЕЯВНОЕ СОЕДИНЕНИЕ ТАБЛИЦ С ФИЛЬТРОМ (WHERE) И СОРТИРОВКОЙ (ORDER BY)
+-- ---------------------------------------------------------------------
+ 
+-- 1.1 Журнал занятий за октябрь 2026: ученик, курс, тема (по дате и ФИО)
+SELECT l.lesson_date AS 'Дата',
+s.student_name AS 'Ученик',
+c.course_name AS 'Курс',
+l.topic AS 'Тема'
+FROM lessons l, students s, courses c
+WHERE l.student_id = s.student_id
+AND l.course_id = c.course_id
+AND l.lesson_date BETWEEN '2026-10-01' AND '2026-10-31'
+ORDER BY l.lesson_date, s.student_name;
+ 
+-- 1.2 Неоплаченные занятия со стоимостью с учётом скидки (по убыванию суммы)
+SELECT s.student_name AS 'Ученик',
+c.course_name AS 'Курс',
+l.lesson_date AS 'Дата',
+ROUND(c.price * (1 - e.discount / 100), 2) AS 'К оплате, руб.'
+FROM lessons l, enrollments e, students s, courses c
+WHERE l.student_id = e.student_id
+AND l.course_id = e.course_id
+AND e.student_id = s.student_id
+AND e.course_id = c.course_id
+AND l.paid = 0
+ORDER BY 4 DESC, s.student_name;
+  
+-- ---------------------------------------------------------------------
+-- 2. ЯВНОЕ СОЕДИНЕНИЕ ТАБЛИЦ (JOIN)
+-- ---------------------------------------------------------------------
+ 
+-- 2.1 INNER JOIN: кто на каком курсе учится и у какого преподавателя
+SELECT s.student_name AS 'Ученик',
+c.course_name AS 'Курс',
+sb.subject_name AS 'Предмет',
+t.teacher_name AS 'Преподаватель',
+e.discount AS 'Скидка, %'
+FROM enrollments e
+INNER JOIN students s ON e.student_id = s.student_id
+INNER JOIN courses c ON e.course_id = c.course_id
+INNER JOIN subjects sb ON c.subject_code = sb.subject_code
+INNER JOIN teachers t ON e.teacher_id = t.teacher_id
+ORDER BY s.student_name;
+  
+-- 2.2 LEFT JOIN: ученики, которые ещё не зачислены ни на один курс
+SELECT s.student_id, s.student_name, s.grade
+FROM students s
+LEFT JOIN enrollments e ON s.student_id = e.student_id
+WHERE e.student_id IS NULL;
+  
+-- 2.3 LEFT JOIN: все курсы и количество учеников на них (включая пустые)
+SELECT c.course_name AS 'Курс',
+COUNT(e.student_id) AS 'Учеников'
+FROM courses c
+LEFT JOIN enrollments e ON c.course_id = e.course_id
+GROUP BY c.course_id, c.course_name
+ORDER BY 2 DESC;
+  
+-- 3. АГРЕГИРУЮЩИЕ ОПЕРАЦИИ (SUM, AVG, COUNT, MAX, MIN)
+-- ---------------------------------------------------------------------
+ 
+-- 3.1 Общая статистика журнала
+SELECT COUNT(*) AS 'Всего записей',
+SUM(attended) AS 'Посещено',
+ROUND(AVG(hw_score), 1) AS 'Средний балл ДЗ',
+MAX(hw_score) AS 'Максимальный балл',
+MIN(hw_score) AS 'Минимальный балл'
+FROM lessons;
+  
+-- 3.2 Самый дорогой и самый дешёвый курс, средняя стоимость занятия
+SELECT MAX(price) AS 'Максимальная цена',
+MIN(price) AS 'Минимальная цена',
+ROUND(AVG(price), 2) AS 'Средняя цена'
+FROM courses;
+  
+-- 3.3 Общая сумма задолженности по всем ученикам
+SELECT ROUND(SUM(c.price * (1 - e.discount / 100)), 2) AS 'Общий долг, руб.'
+FROM lessons l
+JOIN enrollments e ON l.student_id = e.student_id AND l.course_id = e.course_id
+JOIN courses c ON e.course_id = c.course_id
+WHERE l.paid = 0;
+  
+-- ---------------------------------------------------------------------
+-- 4. ГРУППИРОВКА (GROUP BY) И ФИЛЬТРАЦИЯ ГРУПП (HAVING)
+-- ---------------------------------------------------------------------
+ 
+-- 4.1 Задолженность по ученикам — только должники с долгом больше 1000 руб.
+SELECT s.student_name AS 'Ученик',
+COUNT(*) AS 'Неоплачено занятий',
+ROUND(SUM(c.price * (1 - e.discount / 100)), 2) AS 'Долг, руб.'
+FROM lessons l
+JOIN enrollments e ON l.student_id = e.student_id AND l.course_id = e.course_id
+JOIN students s ON e.student_id = s.student_id
+JOIN courses c ON e.course_id = c.course_id
+WHERE l.paid = 0
+GROUP BY s.student_id, s.student_name
+HAVING SUM(c.price * (1 - e.discount / 100)) > 1000
+ORDER BY 3 DESC;
+  
+-- 4.2 Посещаемость и средний балл по ученикам (посещаемость ниже 100 %)
+SELECT s.student_name AS 'Ученик',
+COUNT(*) AS 'Занятий',
+ROUND(100 * SUM(l.attended) / COUNT(*)) AS 'Посещаемость, %',
+ROUND(AVG(l.hw_score), 1) AS 'Средний балл'
+FROM lessons l
+JOIN students s ON l.student_id = s.student_id
+GROUP BY s.student_id, s.student_name
+HAVING SUM(l.attended) < COUNT(*);
+  
+-- 4.3 Оплата преподавателям: число проведённых занятий × ставка
+-- (групповое занятие считается один раз)
+SELECT t.teacher_name AS 'Преподаватель',
+COUNT(DISTINCT l.course_id, l.lesson_date) AS 'Проведено занятий',
+t.rate AS 'Ставка',
+COUNT(DISTINCT l.course_id, l.lesson_date) * t.rate AS 'К выплате, руб.'
+FROM lessons l
+JOIN enrollments e ON l.student_id = e.student_id AND l.course_id = e.course_id
+JOIN teachers t ON e.teacher_id = t.teacher_id
+GROUP BY t.teacher_id, t.teacher_name, t.rate
+HAVING COUNT(DISTINCT l.course_id, l.lesson_date) >= 1
+ORDER BY 4 DESC;
+  
+-- 4.4 Средний балл по курсам — курсы со средним баллом выше 70
+SELECT c.course_name AS 'Курс',
+COUNT(l.hw_score) AS 'Оценённых ДЗ',
+ROUND(AVG(l.hw_score), 1) AS 'Средний балл'
+FROM lessons l
+JOIN courses c ON l.course_id = c.course_id
+GROUP BY c.course_id, c.course_name
+HAVING AVG(l.hw_score) > 70
+ORDER BY 3 DESC;
